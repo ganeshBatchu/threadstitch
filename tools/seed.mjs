@@ -8,7 +8,7 @@
  *
  * Usage:
  *   node tools/seed.mjs [subreddit]
- *   node tools/seed.mjs threadstich_dev
+ *   node tools/seed.mjs threadstitch_dev
  *
  * The subreddit defaults to whatever is in devvit.json "dev.subreddit".
  */
