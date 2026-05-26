@@ -10,6 +10,45 @@ import type { RelatedPost } from '../../shared/api.js';
 
 export const triggers = new Hono();
 
+// ---- flair suggestion helpers ----
+
+// Make a TF-IDF term human-readable: short/numeric tokens (RTX, DDR5) → UPPER CASE,
+// longer normal words → Title Case.
+const displayFlairTerm = (term: string): string => {
+  if (term.length <= 4 || /\d/.test(term)) return term.toUpperCase();
+  return term.charAt(0).toUpperCase() + term.slice(1);
+};
+
+// Stemmed and raw forms that are too generic to use as a flair label
+const FLAIR_BLOCKLIST = new Set([
+  'post', 'like', 'get', 'know', 'think', 'use', 'want', 'help', 'make',
+  'go', 'got', 'run', 'look', 'see', 'work', 'works', 'working', 'tri',
+  'alreadi', 'realli', 'still', 'done', 'come', 'keep', 'check', 'find',
+  'show', 'happen', 'start', 'stop', 'put', 'set', 'add', 'turn', 'switch',
+  'need', 'take', 'fix', 'updat', 'reset', 'test', 'read', 'write',
+  'chang', 'mov', 'remov', 'delet',
+  'good', 'new', 'old', 'high', 'low', 'long', 'short', 'small', 'big',
+  'one', 'two', 'three', 'time', 'back', 'way', 'thing', 'lot', 'bit',
+  'gam', 'issu', 'hit', 'differ',
+  'question', 'answer', 'reddit', 'subreddit', 'thread',
+  'expens', 'cheap', 'cost', 'price', 'budget', 'worth',
+  'pc', 'built', 'build', 'system', 'setup', 'rig', 'spec',
+]);
+
+// Pick the best flair label from a TF-IDF vector: highest-weight non-generic term.
+// Returns a formatted display string, or undefined if nothing meaningful was found.
+const suggestFlair = (vector: Map<string, number>): string | undefined => {
+  let bestTerm: string | undefined;
+  let bestWeight = 0;
+  for (const [term, weight] of vector) {
+    if (weight > bestWeight && term.length >= 3 && !FLAIR_BLOCKLIST.has(term)) {
+      bestWeight = weight;
+      bestTerm = term;
+    }
+  }
+  return bestTerm ? displayFlairTerm(bestTerm) : undefined;
+};
+
 // On install, do nothing
 triggers.post('/on-app-install', async (c) => {
   const input = await c.req.json<OnAppInstallRequest>();
@@ -25,7 +64,8 @@ triggers.post('/on-app-install', async (c) => {
 function formatRelatedComment(
   related: RelatedPost[],
   fallback = false,
-  faqCount = 0
+  faqCount = 0,
+  suggestedFlair?: string
 ): string {
   const isRecurring = !fallback && faqCount >= 3;
 
@@ -56,6 +96,11 @@ function formatRelatedComment(
     if (p.preview && p.preview.trim().length > 10) {
       lines.push(`> ${p.preview.slice(0, 120).trim()}`);
     }
+    lines.push('');
+  }
+
+  if (!fallback && suggestedFlair) {
+    lines.push(`💡 Suggested flair: **${suggestedFlair}**`);
     lines.push('');
   }
 
@@ -184,7 +229,11 @@ triggers.post('/on-post-submit', async (c) => {
         // faqCount = total deduplicated similar posts before slicing to 5.
         // If ≥ 3, the comment heading switches to "Recurring Topic" mode.
         const faqCount = usingFallback ? 0 : deduped.length;
-        const commentText = formatRelatedComment(postsToShow, usingFallback, faqCount);
+
+        // Top-weighted non-generic TF-IDF term → flair label suggestion for mods
+        const suggestedFlair = usingFallback ? undefined : suggestFlair(queryVector);
+
+        const commentText = formatRelatedComment(postsToShow, usingFallback, faqCount, suggestedFlair);
 
         const comment = await reddit.submitComment({
           id: `t3_${rawPostId}` as T3,
