@@ -18,14 +18,28 @@ triggers.post('/on-app-install', async (c) => {
 });
 
 // ---- format related posts as a markdown comment ----
+//
+// faqCount: total number of deduplicated similar posts found (before slicing).
+//   ≥ 3 → treat this as a recurring/FAQ topic and say so explicitly.
 
-function formatRelatedComment(related: RelatedPost[], fallback = false): string {
+function formatRelatedComment(
+  related: RelatedPost[],
+  fallback = false,
+  faqCount = 0
+): string {
+  const isRecurring = !fallback && faqCount >= 3;
+
   const heading = fallback
     ? '## 🧵 ThreadStitch — Other Recent Posts'
-    : '## 🧵 ThreadStitch — Related Discussions';
+    : isRecurring
+      ? '## 🔁 ThreadStitch — Recurring Topic'
+      : '## 🧵 ThreadStitch — Related Discussions';
+
   const intro = fallback
     ? 'The index is still building — here are the most recent posts in this subreddit:'
-    : 'These posts cover similar topics:';
+    : isRecurring
+      ? `This topic has come up **${faqCount} time${faqCount !== 1 ? 's' : ''}** in this subreddit. Here are the most relevant past discussions:`
+      : 'These posts cover similar topics:';
 
   const lines: string[] = [heading, '', intro, ''];
 
@@ -167,7 +181,10 @@ triggers.post('/on-post-submit', async (c) => {
     //    Always post something — even a fallback — so we know the trigger is working.
     if (postsToShow.length > 0) {
       try {
-        const commentText = formatRelatedComment(postsToShow, usingFallback);
+        // faqCount = total deduplicated similar posts before slicing to 5.
+        // If ≥ 3, the comment heading switches to "Recurring Topic" mode.
+        const faqCount = usingFallback ? 0 : deduped.length;
+        const commentText = formatRelatedComment(postsToShow, usingFallback, faqCount);
 
         const comment = await reddit.submitComment({
           id: `t3_${rawPostId}` as T3,
