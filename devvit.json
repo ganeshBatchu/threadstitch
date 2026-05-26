@@ -23,13 +23,6 @@
   "menu": {
     "items": [
       {
-        "label": "Create a new post",
-        "description": "threadstich",
-        "location": "subreddit",
-        "forUserType": "moderator",
-        "endpoint": "/internal/menu/post-create"
-      },
-      {
         "label": "Open Mod Dashboard",
         "description": "Create a community analytics dashboard post showing top topics and trending discussions.",
         "location": "subreddit",
@@ -44,9 +37,6 @@
         "endpoint": "/internal/menu/flush-index"
       }
     ]
-  },
-  "forms": {
-    "exampleForm": "/internal/form/example-submit"
   },
   "triggers": {
     "onAppInstall": "/internal/triggers/on-app-install",
