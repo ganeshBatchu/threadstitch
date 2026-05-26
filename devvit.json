@@ -43,6 +43,14 @@
     "onPostSubmit": "/internal/triggers/on-post-submit",
     "onPostDelete": "/internal/triggers/on-post-delete"
   },
+  "scheduler": {
+    "tasks": {
+      "weekly-digest": {
+        "endpoint": "/internal/scheduler/weekly-digest",
+        "cron": "0 9 * * 1"
+      }
+    }
+  },
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build"
