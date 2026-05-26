@@ -40,7 +40,8 @@
   },
   "triggers": {
     "onAppInstall": "/internal/triggers/on-app-install",
-    "onPostSubmit": "/internal/triggers/on-post-submit"
+    "onPostSubmit": "/internal/triggers/on-post-submit",
+    "onPostDelete": "/internal/triggers/on-post-delete"
   },
   "scripts": {
     "dev": "vite build --watch",

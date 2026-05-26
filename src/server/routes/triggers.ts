@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
-import type { OnAppInstallRequest, OnPostSubmitRequest, TriggerResponse } from '@devvit/web/shared';
-import { context, reddit } from '@devvit/web/server';
+import type { OnAppInstallRequest, OnPostSubmitRequest, OnPostDeleteRequest, TriggerResponse } from '@devvit/web/shared';
+import { context, reddit, redis } from '@devvit/web/server';
 import type { T3 } from '@devvit/shared-types/tid.js';
 import { indexPost, findSimilar } from '../services/similarity.js';
-import { storePostMeta, getPostMeta, cacheRelated } from '../services/storage.js';
+import { storePostMeta, getPostMeta, cacheRelated, getPostVector } from '../services/storage.js';
 import { rankRelated } from '../services/ranking.js';
 import type { PostMeta } from '../services/storage.js';
 import type { RelatedPost } from '../../shared/api.js';
@@ -215,6 +215,50 @@ triggers.post('/on-post-submit', async (c) => {
   } catch (error) {
     // Never crash post creation
     console.error('ThreadStitch onPostSubmit error:', error);
+    return c.json<TriggerResponse>({}, 200);
+  }
+});
+
+// Fires when a post is deleted — removes it from the TF-IDF index so
+// future similarity searches never surface links to deleted content.
+triggers.post('/on-post-delete', async (c) => {
+  try {
+    const input = await c.req.json<OnPostDeleteRequest>();
+    const post = input.post;
+    const subreddit = input.subreddit;
+
+    if (!post || !subreddit) return c.json<TriggerResponse>({}, 200);
+
+    const subredditName = subreddit.name ?? context.subredditName ?? 'unknown';
+    const rawPostId = post.id.startsWith('t3_') ? post.id.slice(3) : post.id;
+
+    // Read the stored vector to know which inverted-index entries to remove
+    const vector = await getPostVector(rawPostId);
+    const terms = Array.from(vector.keys());
+
+    const keysToDelete = [
+      `meta:${rawPostId}`,
+      `vec:${rawPostId}`,
+      `related:${rawPostId}`,
+      `clicks:${rawPostId}`,
+    ];
+
+    await Promise.all([
+      // Bulk-delete all per-post Redis keys
+      redis.del(...keysToDelete),
+      // Remove post from the chronological posts ZSET
+      redis.zRem(`posts:${subredditName}`, [rawPostId]),
+      // Remove post from every inverted-index bucket it appears in
+      ...terms.map((term) => redis.zRem(`idx:${subredditName}:${term}`, [rawPostId])),
+    ]);
+
+    console.log(
+      `ThreadStitch: cleaned up deleted post ${rawPostId} ` +
+      `(${terms.length} index terms removed)`
+    );
+    return c.json<TriggerResponse>({}, 200);
+  } catch (error) {
+    console.error('ThreadStitch onPostDelete error:', error);
     return c.json<TriggerResponse>({}, 200);
   }
 });
