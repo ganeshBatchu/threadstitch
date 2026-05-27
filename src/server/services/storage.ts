@@ -215,6 +215,8 @@ export const flushAllData = async (subreddit: string): Promise<{ posts: number; 
     ...terms.flatMap((term) => [
       `idx:${subreddit}:${term}`,
       `df:${subreddit}:${term}`,
+      // One-time mod-mail alert flags — must be cleared so re-seeding re-triggers alerts
+      `faq_alerted:${subreddit}:${term}`,
     ]),
     // Subreddit-level keys
     `count:${subreddit}`,
