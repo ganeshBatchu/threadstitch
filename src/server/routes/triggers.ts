@@ -273,6 +273,38 @@ triggers.post('/on-post-submit', async (c) => {
 
         const commentText = formatRelatedComment(postsToShow, usingFallback, faqCount, suggestedFlair, isRecurringTopic);
 
+        // Alert the mod team the FIRST time a topic crosses the recurring threshold.
+        // Use a Redis flag (faq_alerted:{sub}:{term}) so the alert fires once per topic,
+        // not on every subsequent post.
+        if (isRecurringTopic && suggestedFlair) {
+          const alertKey = `faq_alerted:${subredditName}:${suggestedFlair.toLowerCase()}`;
+          const alreadyAlerted = await redis.get(alertKey);
+          if (!alreadyAlerted) {
+            await redis.set(alertKey, '1');
+            // No TTL — we want this to persist so we never re-alert the same topic
+            reddit.modMail.createConversation({
+              subredditName,
+              subject: `⚠️ Recurring topic detected: ${suggestedFlair}`,
+              body: [
+                `ThreadStitch has detected a **recurring topic** in r/${subredditName}.`,
+                '',
+                `**Topic:** ${suggestedFlair}`,
+                `**Similar posts found:** ${faqCount}`,
+                '',
+                'Recent posts in this cluster:',
+                ...postsToShow.slice(0, 4).map((p, i) => `${i + 1}. [${p.title}](${p.url})`),
+                '',
+                'Consider pinning a megathread or adding a FAQ entry.',
+                'Open the **Mod Dashboard** to create a megathread in one click.',
+                '',
+                '^(ThreadStitch recurring topic alert · threshold configurable in App Settings)',
+              ].join('\n'),
+              to: null,
+              isAuthorHidden: true,
+            }).catch((e) => console.warn('ThreadStitch: FAQ alert mail failed:', e));
+          }
+        }
+
         const comment = await reddit.submitComment({
           id: `t3_${rawPostId}` as T3,
           text: commentText,
