@@ -48,10 +48,8 @@
       "faq_threshold": {
         "label": "FAQ Alert Threshold",
         "type": "number",
-        "helpText": "How many similar posts before a topic is marked Recurring and mods are alerted (default: 3, min: 2, max: 10)",
-        "defaultValue": 3,
-        "min": 2,
-        "max": 10
+        "helpText": "How many similar posts before a topic is marked Recurring and mods are alerted (default: 3)",
+        "defaultValue": 3
       },
       "digest_enabled": {
         "label": "Weekly Digest",
@@ -62,18 +60,14 @@
       "min_similarity_pct": {
         "label": "Minimum Similarity %",
         "type": "number",
-        "helpText": "Minimum similarity score (0–100) for a post to appear as Related (default: 40)",
-        "defaultValue": 40,
-        "min": 10,
-        "max": 90
+        "helpText": "Minimum similarity score (0-100) for a post to appear as Related (default: 40)",
+        "defaultValue": 40
       },
       "max_related_posts": {
         "label": "Max Related Posts",
         "type": "number",
-        "helpText": "Maximum number of related posts shown per sticky comment (default: 5, range: 3–10)",
-        "defaultValue": 5,
-        "min": 3,
-        "max": 10
+        "helpText": "Maximum number of related posts shown per sticky comment (default: 5)",
+        "defaultValue": 5
       }
     }
   },
