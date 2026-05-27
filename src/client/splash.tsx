@@ -1,10 +1,10 @@
 import './index.css';
 
-import { StrictMode, useState } from 'react';
+import { StrictMode, useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { navigateTo, requestExpandedMode } from '@devvit/web/client';
+import { context, navigateTo, requestExpandedMode } from '@devvit/web/client';
 import { useRelated } from './hooks/useRelated.js';
-import type { RelatedPost } from '../shared/api.js';
+import type { DashboardData, RelatedPost } from '../shared/api.js';
 
 // ---- helpers ----
 
@@ -52,11 +52,105 @@ const PostCard = ({ post, onNavigate }: { post: RelatedPost; onNavigate: (p: Rel
   </button>
 );
 
+// ---- mini subreddit overview (shown when no per-post related posts exist) ----
+
+const displayTerm = (term: string): string => {
+  if (term.length <= 4 || /\d/.test(term)) return term.toUpperCase();
+  return term.charAt(0).toUpperCase() + term.slice(1);
+};
+
+const SubredditOverview = () => {
+  const [dash, setDash] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const subreddit = context.subredditName;
+    const url = subreddit
+      ? `/api/dashboard?subreddit=${encodeURIComponent(subreddit)}`
+      : '/api/dashboard';
+    fetch(url)
+      .then((r) => r.json())
+      .then((d) => setDash(d as DashboardData))
+      .catch(() => {/* silent */})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-6">
+        <div className="w-4 h-4 border-2 border-[#d93900] border-t-transparent rounded-full animate-spin" />
+        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">Loading…</span>
+      </div>
+    );
+  }
+
+  if (!dash || dash.totalPosts === 0) {
+    return (
+      <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-4">
+        No posts indexed yet — submit a post to get started.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* stats row */}
+      <div className="flex gap-2">
+        {[
+          { label: 'total posts', value: dash.totalPosts },
+          { label: 'this week', value: dash.postsThisWeek },
+          { label: 'topic clusters', value: dash.topTopics.length },
+        ].map((s) => (
+          <div key={s.label} className="flex-1 flex flex-col items-center py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <span className="text-sm font-bold text-gray-900 dark:text-white">{s.value}</span>
+            <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight text-center">{s.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* top topic chips */}
+      {dash.topTopics.length > 0 && (
+        <div>
+          <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1.5">🔥 Top Topics</p>
+          <div className="flex flex-wrap gap-1.5">
+            {dash.topTopics.slice(0, 6).map((t) => (
+              <span
+                key={t.term}
+                className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400"
+              >
+                {displayTerm(t.term)} · {t.postCount}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* trending chips */}
+      {dash.trending.length > 0 && (
+        <div>
+          <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1.5">📈 Trending</p>
+          <div className="flex flex-wrap gap-1.5">
+            {dash.trending.slice(0, 4).map((t) => (
+              <span
+                key={t.term}
+                className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+              >
+                {displayTerm(t.term)} {t.growthMultiplier}×
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ---- main splash component ----
 
 export const Splash = () => {
   const { posts, loading, source } = useRelated();
   const [expanded, setExpanded] = useState(false);
+  const showOverview = !loading && posts.length === 0 && source !== 'fallback';
 
   const display = expanded ? posts : posts.slice(0, 3);
   const hasMore = posts.length > 3 && !expanded;
@@ -74,7 +168,9 @@ export const Splash = () => {
             </div>
             <div>
               <h1 className="text-sm font-bold text-gray-900 dark:text-white leading-tight">ThreadStitch</h1>
-              <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">Related Discussions</p>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                {showOverview ? 'Community Overview' : 'Related Discussions'}
+              </p>
             </div>
           </div>
           {posts.length > 0 && (
@@ -93,20 +189,11 @@ export const Splash = () => {
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="w-5 h-5 border-2 border-[#d93900] border-t-transparent rounded-full animate-spin" />
-            <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Finding related posts…</span>
+            <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Loading…</span>
           </div>
-        ) : display.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <svg className="w-10 h-10 text-gray-300 dark:text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-            </svg>
-            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">No related discussions yet</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              {source === 'fallback'
-                ? 'Browse the subreddit for similar posts'
-                : 'ThreadStitch builds index as more posts arrive'}
-            </p>
-          </div>
+        ) : showOverview ? (
+          /* Dashboard post / no per-post data — show subreddit stats instead */
+          <SubredditOverview />
         ) : (
           <>
             {display.map((p) => (
