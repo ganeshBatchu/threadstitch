@@ -140,8 +140,9 @@ const TopicCard = ({ topic, rank, isOpen, onToggle, onCreateMegathread, isCreati
 
 // ---- trending chip ----
 
-const TrendingChip = ({ topic }: { topic: TrendingTopic }) => (
+const TrendingChip = ({ topic, onClick }: { topic: TrendingTopic; onClick?: () => void }) => (
   <button
+    onClick={onClick}
     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${multiplierColor(topic.growthMultiplier)}`}
   >
     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -355,10 +356,14 @@ const Dashboard = () => {
               </div>
             ) : (
               <>
-                {/* chip cloud */}
+                {/* chip cloud — clicking scrolls to the detail row */}
                 <div className="flex flex-wrap gap-2 mb-6">
                   {data.trending.map((t) => (
-                    <TrendingChip key={t.term} topic={t} />
+                    <TrendingChip
+                      key={t.term}
+                      topic={t}
+                      onClick={() => document.getElementById(`trending-${t.term}`)?.scrollIntoView({ behavior: 'smooth' })}
+                    />
                   ))}
                 </div>
 
@@ -367,6 +372,7 @@ const Dashboard = () => {
                   {data.trending.map((t) => (
                     <div
                       key={t.term}
+                      id={`trending-${t.term}`}
                       className="flex items-center justify-between rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 shadow-sm"
                     >
                       <div>

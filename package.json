@@ -22,13 +22,10 @@
     "@devvit/start": "0.12.24",
     "@devvit/web": "0.12.24",
     "@hono/node-server": "2.0.3",
-    "compromise": "^14.15.0",
     "devvit": "0.12.24",
     "hono": "4.12.21",
-    "natural": "^8.1.1",
     "react": "19.2.6",
-    "react-dom": "19.2.6",
-    "stopword": "^3.1.5"
+    "react-dom": "19.2.6"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

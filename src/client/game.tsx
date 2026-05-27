@@ -100,7 +100,7 @@ const EmptyState = ({ source }: { source: 'cache' | 'computed' | 'fallback' | nu
 
 const LoadingState = () => (
   <div className="flex flex-col items-center justify-center py-16">
-    <div className="w-8 h-8 border-3 border-[#d93900] border-t-transparent rounded-full animate-spin mb-4" />
+    <div className="w-8 h-8 border-2 border-[#d93900] border-t-transparent rounded-full animate-spin mb-4" />
     <p className="text-sm text-gray-500 dark:text-gray-400">Finding related discussions…</p>
   </div>
 );

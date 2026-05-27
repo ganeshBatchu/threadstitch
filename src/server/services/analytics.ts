@@ -13,8 +13,8 @@ const GENERIC_TERMS = new Set([
   'go', 'got', 'run', 'look', 'see', 'work', 'works', 'working', 'tri',
   'alreadi', 'realli', 'still', 'done', 'come', 'keep', 'check', 'find',
   'show', 'happen', 'start', 'stop', 'put', 'set', 'add', 'turn', 'switch',
-  'need', 'take', 'fix', 'updat', 'reset', 'test', 'test', 'read', 'write',
-  'chang', 'chang', 'mov', 'remov', 'delet',
+  'need', 'take', 'fix', 'updat', 'reset', 'test', 'read', 'write',
+  'chang', 'mov', 'remov', 'delet',
   // quantity / descriptor
   'good', 'new', 'old', 'high', 'low', 'long', 'short', 'small', 'big',
   'one', 'two', 'three', 'time', 'back', 'way', 'thing', 'lot', 'bit',

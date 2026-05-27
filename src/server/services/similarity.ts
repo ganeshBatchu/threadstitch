@@ -46,10 +46,8 @@ const stem = (word: string): string => {
   if (word.endsWith('tion'))    return word.slice(0, -3);
   if (word.endsWith('ings'))    return word.slice(0, -4);
   if (word.endsWith('ing'))     return word.slice(0, -3);
-  if (word.endsWith('tion'))    return word.slice(0, -3);
   if (word.endsWith('ely'))     return word.slice(0, -3);
   if (word.endsWith('ies'))     return word.slice(0, -3) + 'y';
-  if (word.endsWith('ness'))    return word.slice(0, -4);
   if (word.endsWith('ers'))     return word.slice(0, -2);
   if (word.endsWith('er'))      return word.slice(0, -2);
   if (word.endsWith('ed'))      return word.slice(0, -2);

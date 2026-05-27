@@ -1,9 +1,6 @@
 import { Hono } from 'hono';
 import { context, redis, reddit } from '@devvit/web/server';
 import type {
-  DecrementResponse,
-  IncrementResponse,
-  InitResponse,
   RelatedPostsResponse,
   RecordClickRequest,
   RecordClickResponse,
@@ -32,50 +29,6 @@ import { findSimilar } from '../services/similarity.js';
 import { rankRelated } from '../services/ranking.js';
 
 export const api = new Hono();
-
-api.get('/init', async (c) => {
-  const { postId } = context;
-
-  if (!postId) {
-    return c.json<ErrorResponse>(
-      { status: 'error', message: 'postId is required but missing from context' },
-      400
-    );
-  }
-
-  try {
-    const [count, username] = await Promise.all([
-      redis.get('count'),
-      reddit.getCurrentUsername(),
-    ]);
-
-    return c.json<InitResponse>({
-      type: 'init',
-      postId,
-      count: count ? parseInt(count) : 0,
-      username: username ?? 'anonymous',
-    });
-  } catch (error) {
-    return c.json<ErrorResponse>(
-      { status: 'error', message: error instanceof Error ? error.message : 'Init failed' },
-      400
-    );
-  }
-});
-
-api.post('/increment', async (c) => {
-  const { postId } = context;
-  if (!postId) return c.json<ErrorResponse>({ status: 'error', message: 'postId required' }, 400);
-  const count = await redis.incrBy('count', 1);
-  return c.json<IncrementResponse>({ count, postId, type: 'increment' });
-});
-
-api.post('/decrement', async (c) => {
-  const { postId } = context;
-  if (!postId) return c.json<ErrorResponse>({ status: 'error', message: 'postId required' }, 400);
-  const count = await redis.incrBy('count', -1);
-  return c.json<DecrementResponse>({ count, postId, type: 'decrement' });
-});
 
 // GET /api/related — returns related posts for the current ThreadStitch widget.
 //
