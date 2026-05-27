@@ -3,7 +3,7 @@ import './index.css';
 import { StrictMode, useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { context, navigateTo } from '@devvit/web/client';
-import type { DashboardData, TopicCluster, TrendingTopic } from '../shared/api.js';
+import type { DashboardData, MegathreadResponse, TopicCluster, TrendingTopic } from '../shared/api.js';
 
 // ---- helpers ----
 
@@ -45,6 +45,9 @@ type TopicCardProps = {
   rank: number;
   isOpen: boolean;
   onToggle: () => void;
+  onCreateMegathread: (topic: TopicCluster) => void;
+  isCreating: boolean;
+  megathreadUrl?: string;
 };
 
 const heatColor = (rank: number): string => {
@@ -55,7 +58,7 @@ const heatColor = (rank: number): string => {
   return 'bg-gray-400';
 };
 
-const TopicCard = ({ topic, rank, isOpen, onToggle }: TopicCardProps) => (
+const TopicCard = ({ topic, rank, isOpen, onToggle, onCreateMegathread, isCreating, megathreadUrl }: TopicCardProps) => (
   <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden shadow-sm">
     <button
       onClick={onToggle}
@@ -89,19 +92,47 @@ const TopicCard = ({ topic, rank, isOpen, onToggle }: TopicCardProps) => (
     </button>
 
     {isOpen && (
-      <div className="border-t border-gray-100 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
-        {topic.posts.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => navigateTo(p.url)}
-            className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group"
-          >
-            <p className="text-sm text-gray-800 dark:text-gray-200 group-hover:text-[#d93900] dark:group-hover:text-orange-400 leading-snug line-clamp-2">
-              {p.title}
-            </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{timeAgo(p.createdAt)}</p>
-          </button>
-        ))}
+      <div className="border-t border-gray-100 dark:border-gray-700">
+        <div className="divide-y divide-gray-100 dark:divide-gray-700">
+          {topic.posts.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => navigateTo(p.url)}
+              className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group"
+            >
+              <p className="text-sm text-gray-800 dark:text-gray-200 group-hover:text-[#d93900] dark:group-hover:text-orange-400 leading-snug line-clamp-2">
+                {p.title}
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{timeAgo(p.createdAt)}</p>
+            </button>
+          ))}
+        </div>
+        {/* Megathread action */}
+        <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/60 border-t border-gray-100 dark:border-gray-700">
+          {megathreadUrl ? (
+            <button
+              onClick={() => navigateTo(megathreadUrl)}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-semibold"
+            >
+              ✅ Megathread created — view it
+            </button>
+          ) : (
+            <button
+              onClick={() => onCreateMegathread(topic)}
+              disabled={isCreating}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-[#d93900] hover:bg-[#c23200] disabled:opacity-60 text-white text-xs font-semibold transition-colors"
+            >
+              {isCreating ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Creating…
+                </>
+              ) : (
+                <>📌 Create Megathread</>
+              )}
+            </button>
+          )}
+        </div>
       </div>
     )}
   </div>
@@ -166,6 +197,30 @@ const Dashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [openTopic, setOpenTopic] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'topics' | 'trending' | 'recent'>('topics');
+  const [creatingMegathread, setCreatingMegathread] = useState<string | null>(null);
+  const [megathreadUrls, setMegathreadUrls] = useState<Record<string, string>>({});
+
+  const handleCreateMegathread = async (topic: TopicCluster) => {
+    if (creatingMegathread) return;
+    setCreatingMegathread(topic.term);
+    try {
+      const subreddit = context.subredditName;
+      const res = await fetch('/api/megathread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ term: topic.term, posts: topic.posts, subreddit }),
+      });
+      const json = await res.json() as MegathreadResponse;
+      if (json.status === 'ok') {
+        setMegathreadUrls((prev) => ({ ...prev, [topic.term]: json.url }));
+        navigateTo(json.url);
+      }
+    } catch (e) {
+      console.error('Failed to create megathread:', e);
+    } finally {
+      setCreatingMegathread(null);
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -273,6 +328,9 @@ const Dashboard = () => {
                     rank={i}
                     isOpen={openTopic === topic.term}
                     onToggle={() => setOpenTopic(openTopic === topic.term ? null : topic.term)}
+                    onCreateMegathread={handleCreateMegathread}
+                    isCreating={creatingMegathread === topic.term}
+                    megathreadUrl={megathreadUrls[topic.term]}
                   />
                 ))}
               </div>

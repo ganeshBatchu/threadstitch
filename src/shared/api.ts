@@ -76,3 +76,12 @@ export type DashboardData = {
   recentPosts: Array<{ id: string; title: string; url: string; createdAt: number }>;
   computedAt: number;
 };
+
+export type MegathreadResponse = {
+  status: 'ok';
+  url: string;
+  postId: string;
+} | {
+  status: 'error';
+  message: string;
+};

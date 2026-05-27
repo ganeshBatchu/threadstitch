@@ -19,6 +19,12 @@ import {
   recordClick,
   flushAllData,
 } from '../services/storage.js';
+
+// ---- helpers shared across endpoints ----
+const displayTerm = (term: string): string => {
+  if (term.length <= 4 || /\d/.test(term)) return term.toUpperCase();
+  return term.charAt(0).toUpperCase() + term.slice(1);
+};
 import { computeDashboard } from '../services/analytics.js';
 import type { DashboardData } from '../../shared/api.js';
 import { findSimilar } from '../services/similarity.js';
@@ -255,6 +261,54 @@ api.post('/admin/flush', async (c) => {
     return c.json({ status: 'ok', deleted: { posts, terms } });
   } catch (err) {
     console.error('ThreadStitch flush error:', err);
+    return c.json({ status: 'error', message: String(err) }, 500);
+  }
+});
+
+// POST /api/megathread — mod action: create a pinned megathread for a topic cluster.
+// Called from the dashboard Topics tab "Create Megathread" button.
+// Body: { term: string, posts: Array<{title, url}>, subreddit: string }
+api.post('/megathread', async (c) => {
+  try {
+    const body = await c.req.json<{
+      term: string;
+      posts: Array<{ title: string; url: string }>;
+      subreddit: string;
+    }>();
+
+    const { term, posts, subreddit } = body;
+    if (!term || !subreddit) {
+      return c.json({ status: 'error', message: 'term and subreddit required' }, 400);
+    }
+
+    const label = displayTerm(term);
+    const postLines = posts
+      .slice(0, 8)
+      .map((p, i) => `${i + 1}. [${p.title}](${p.url})`)
+      .join('\n');
+
+    const bodyText = [
+      `Use this thread to discuss anything related to **${label}** in this community.`,
+      '',
+      'Previous discussions on this topic:',
+      '',
+      postLines,
+      '',
+      '---',
+      '^(Created by ThreadStitch · auto-generated from recurring topic cluster)',
+    ].join('\n');
+
+    const post = await reddit.submitPost({
+      subredditName: subreddit,
+      title: `📌 Megathread: ${label}`,
+      text: bodyText,
+      runAs: 'APP',
+    });
+
+    console.log(`ThreadStitch megathread: created ${post.id} for term "${term}" in r/${subreddit}`);
+    return c.json({ status: 'ok', url: `https://reddit.com${post.permalink}`, postId: post.id });
+  } catch (err) {
+    console.error('ThreadStitch /api/megathread error:', err);
     return c.json({ status: 'error', message: String(err) }, 500);
   }
 });
