@@ -50,10 +50,40 @@ const suggestFlair = (vector: Map<string, number>): string | undefined => {
   return bestTerm ? displayFlairTerm(bestTerm) : undefined;
 };
 
-// On install, do nothing
+// On install — send a welcome mod mail explaining what ThreadStitch does
 triggers.post('/on-app-install', async (c) => {
   const input = await c.req.json<OnAppInstallRequest>();
-  console.log(`ThreadStitch installed in ${context.subredditName} (${input.type})`);
+  const subreddit = context.subredditName ?? 'your subreddit';
+  console.log(`ThreadStitch installed in ${subreddit} (${input.type})`);
+
+  try {
+    await reddit.modMail.createConversation({
+      subredditName: subreddit,
+      subject: '🧵 ThreadStitch is now active!',
+      body: [
+        `ThreadStitch has been installed in **r/${subreddit}** and is ready to go — no configuration required.`,
+        '',
+        '**What it does:**',
+        '- Posts a sticky comment on every new submission linking to the most similar past discussions',
+        '- Flags topics as "🔁 Recurring" when they come up repeatedly, so you know before they flood the queue',
+        '- Suggests a flair label on each post based on TF-IDF content analysis',
+        '- Auto-posts a weekly community digest every Monday with top topics and trending signals',
+        '',
+        '**Mod tools:**',
+        '- **Mod menu → Open Mod Dashboard** — analytics: top topic clusters, trending terms, recent activity, and one-click megathread creation',
+        '- **Mod menu → Flush ThreadStitch Index** — wipe the index (useful after a dev reset)',
+        '- **Mod tools → App Settings** — configure the FAQ threshold, minimum similarity, max posts shown, and digest toggle',
+        '',
+        '^(Powered by ThreadStitch · TF-IDF content similarity)',
+      ].join('\n'),
+      to: null, // sends to the subreddit mod inbox
+      isAuthorHidden: true,
+    });
+  } catch (mailErr) {
+    // Never crash the install — mod mail is best-effort
+    console.warn('ThreadStitch: welcome mod mail failed:', mailErr);
+  }
+
   return c.json<TriggerResponse>({}, 200);
 });
 
