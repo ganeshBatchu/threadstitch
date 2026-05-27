@@ -5,6 +5,7 @@ import type { T3 } from '@devvit/shared-types/tid.js';
 import { indexPost, findSimilar } from '../services/similarity.js';
 import { storePostMeta, getPostMeta, cacheRelated, getPostVector } from '../services/storage.js';
 import { rankRelated } from '../services/ranking.js';
+import { getSettings } from '../services/settings.js';
 import type { PostMeta } from '../services/storage.js';
 import type { RelatedPost } from '../../shared/api.js';
 
@@ -65,9 +66,10 @@ function formatRelatedComment(
   related: RelatedPost[],
   fallback = false,
   faqCount = 0,
-  suggestedFlair?: string
+  suggestedFlair?: string,
+  isRecurring = false
 ): string {
-  const isRecurring = !fallback && faqCount >= 3;
+  // isRecurring is pre-computed by the caller using the mod-configured threshold
 
   const heading = fallback
     ? '## 🧵 ThreadStitch — Other Recent Posts'
@@ -148,10 +150,13 @@ triggers.post('/on-post-submit', async (c) => {
       subreddit: subredditName,
     };
 
-    // 1. Index the new post (TF-IDF vectorization + update inverted index)
+    // 1. Load mod-configured settings (with safe defaults)
+    const appSettings = await getSettings();
+
+    // 2. Index the new post (TF-IDF vectorization + update inverted index)
     const queryVector = await indexPost(meta);
 
-    // 2. Find similar posts using the inverted index
+    // 3. Find similar posts using the inverted index
     const candidates = await findSimilar(meta, queryVector, 8);
     let rankedRelated: ReturnType<typeof rankRelated> = [];
 
@@ -162,21 +167,23 @@ triggers.post('/on-post-submit', async (c) => {
           return m ? { ...cand, meta: m, clickCount: 0 } : null;
         })
       );
-      const valid = candidateMetas.filter((m) => m !== null);
+      // Apply mod-configured minimum similarity threshold
+      const minSim = appSettings.minSimilarityPct / 100;
+      const valid = candidateMetas.filter((m) => m !== null && m.similarity >= minSim);
       if (valid.length > 0) {
         rankedRelated = rankRelated(valid);
       }
     }
 
-    // 3. Store the original post's metadata (needed for future similarity lookups)
+    // 4. Store the original post's metadata (needed for future similarity lookups)
     await storePostMeta(meta);
 
-    // 4. Cache related posts so the /api/related endpoint can serve them quickly
+    // 5. Cache related posts so the /api/related endpoint can serve them quickly
     if (rankedRelated.length > 0) {
       await cacheRelated(meta.id, rankedRelated.slice(0, 10)); // cache more, dedup later
     }
 
-    // 5. Deduplicate by title (multiple seed runs create identical posts with different IDs)
+    // 6. Deduplicate by title (multiple seed runs create identical posts with different IDs)
     const deduped = (() => {
       const seen = new Set<string>();
       return rankedRelated.filter((p) => {
@@ -187,8 +194,8 @@ triggers.post('/on-post-submit', async (c) => {
       });
     })();
 
-    // 6. If TF-IDF found nothing (index too small), fall back to Reddit's hot posts
-    let postsToShow = deduped.slice(0, 5);
+    // 7. If TF-IDF found nothing (index too small), fall back to Reddit's hot posts
+    let postsToShow = deduped.slice(0, appSettings.maxRelatedPosts);
     let usingFallback = false;
     if (postsToShow.length === 0) {
       try {
@@ -203,7 +210,7 @@ triggers.post('/on-post-submit', async (c) => {
             !p.title.startsWith('🔍 Related:') &&                  // not an old widget post
             !p.title.startsWith('🧵 ThreadStitch')                 // not a bot post
           )
-          .slice(0, 5);
+          .slice(0, appSettings.maxRelatedPosts);
         if (others.length > 0) {
           postsToShow = others.map((p) => ({
             id: p.id,
@@ -226,14 +233,15 @@ triggers.post('/on-post-submit', async (c) => {
     //    Always post something — even a fallback — so we know the trigger is working.
     if (postsToShow.length > 0) {
       try {
-        // faqCount = total deduplicated similar posts before slicing to 5.
-        // If ≥ 3, the comment heading switches to "Recurring Topic" mode.
+        // faqCount = total deduplicated similar posts before slicing to maxRelatedPosts.
+        // If ≥ faqThreshold (mod-configurable, default 3), comment switches to "Recurring Topic".
         const faqCount = usingFallback ? 0 : deduped.length;
+        const isRecurringTopic = !usingFallback && faqCount >= appSettings.faqThreshold;
 
         // Top-weighted non-generic TF-IDF term → flair label suggestion for mods
         const suggestedFlair = usingFallback ? undefined : suggestFlair(queryVector);
 
-        const commentText = formatRelatedComment(postsToShow, usingFallback, faqCount, suggestedFlair);
+        const commentText = formatRelatedComment(postsToShow, usingFallback, faqCount, suggestedFlair, isRecurringTopic);
 
         const comment = await reddit.submitComment({
           id: `t3_${rawPostId}` as T3,

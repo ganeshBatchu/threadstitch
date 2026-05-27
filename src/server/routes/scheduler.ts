@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { context, reddit } from '@devvit/web/server';
 import type { TaskRequest, TaskResponse } from '@devvit/web/server';
 import { computeDashboard } from '../services/analytics.js';
+import { getSettings } from '../services/settings.js';
 
 export const schedulerRoutes = new Hono();
 
@@ -84,6 +85,13 @@ schedulerRoutes.post('/weekly-digest', async (c) => {
   }
 
   try {
+    // Respect the mod-configured digest toggle
+    const appSettings = await getSettings();
+    if (!appSettings.digestEnabled) {
+      console.log(`ThreadStitch weekly-digest: digest disabled for r/${subreddit} — skipping`);
+      return c.json<TaskResponse>({});
+    }
+
     const data = await computeDashboard(subreddit);
 
     // Nothing to report yet

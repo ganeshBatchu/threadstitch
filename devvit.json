@@ -43,6 +43,40 @@
     "onPostSubmit": "/internal/triggers/on-post-submit",
     "onPostDelete": "/internal/triggers/on-post-delete"
   },
+  "settings": {
+    "subreddit": {
+      "faq_threshold": {
+        "label": "FAQ Alert Threshold",
+        "type": "number",
+        "helpText": "How many similar posts before a topic is marked Recurring and mods are alerted (default: 3, min: 2, max: 10)",
+        "defaultValue": 3,
+        "min": 2,
+        "max": 10
+      },
+      "digest_enabled": {
+        "label": "Weekly Digest",
+        "type": "boolean",
+        "helpText": "Auto-post a community digest every Monday summarising top topics and trends (default: on)",
+        "defaultValue": true
+      },
+      "min_similarity_pct": {
+        "label": "Minimum Similarity %",
+        "type": "number",
+        "helpText": "Minimum similarity score (0–100) for a post to appear as Related (default: 40)",
+        "defaultValue": 40,
+        "min": 10,
+        "max": 90
+      },
+      "max_related_posts": {
+        "label": "Max Related Posts",
+        "type": "number",
+        "helpText": "Maximum number of related posts shown per sticky comment (default: 5, range: 3–10)",
+        "defaultValue": 5,
+        "min": 3,
+        "max": 10
+      }
+    }
+  },
   "scheduler": {
     "tasks": {
       "weekly-digest": {
