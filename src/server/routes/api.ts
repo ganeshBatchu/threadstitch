@@ -16,6 +16,7 @@ import {
   getPostVector,
   getPostCount,
   getOriginalPostId,
+  getClickCounts,
   recordClick,
   flushAllData,
 } from '../services/storage.js';
@@ -120,14 +121,19 @@ api.get('/related', async (c) => {
     // --- Step 3: on-demand computation using stored vector ---
     const meta = await getPostMeta(originalPostId);
     if (meta) {
-      const vector = await getPostVector(originalPostId);
+      const [vector, clickCounts] = await Promise.all([
+        getPostVector(originalPostId),
+        getClickCounts(originalPostId),
+      ]);
       if (vector.size > 0) {
         const candidates = await findSimilar(meta, vector, 8);
         if (candidates.length > 0) {
           const candidateMetas = await Promise.all(
             candidates.map(async (cand) => {
               const m = await getPostMeta(cand.postId);
-              return m ? { ...cand, meta: m, clickCount: 0 } : null;
+              // Pass real click counts so collaborative filtering signal is live
+              const clickCount = clickCounts.get(cand.postId) ?? 0;
+              return m ? { ...cand, meta: m, clickCount } : null;
             })
           );
           const valid = candidateMetas.filter((m) => m !== null);
